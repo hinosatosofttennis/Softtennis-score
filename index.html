@@ -36,7 +36,6 @@
         <!-- 試合情報入力セクション -->
         <section id="match-info" class="bg-white p-4 rounded-lg shadow-md mb-4">
             <h2 class="text-lg font-bold mb-2 border-b pb-2">試合情報</h2>
-            <!-- ▼▼▼ ここからが更新箇所です ▼▼▼ -->
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-4">
                 <input type="text" id="tournament-name" placeholder="大会名" class="p-2 border rounded">
                 <input type="text" id="entry-category" placeholder="エントリー区分" class="p-2 border rounded">
@@ -54,7 +53,6 @@
                 <input type="text" id="line-referee1" placeholder="線審" class="p-2 border rounded">
                 <input type="text" id="line-referee2" placeholder="線審" class="p-2 border rounded">
             </div>
-            <!-- ▲▲▲ ここまでが更新箇所です ▲▲▲ -->
             <div class="grid grid-cols-2 gap-4 mt-4 text-center">
                 <div class="bg-gray-100 p-2 rounded">
                     <span class="text-sm text-gray-500">開始時間</span>
@@ -88,6 +86,7 @@
                     <h3 id="pre-match-player-a-display" class="font-bold text-xl mb-2 break-words">プレーヤー A</h3>
                     <div class="space-y-2">
                         <button data-player="A" data-choice="serve" class="pre-match-btn btn w-full bg-green-500 text-white p-3 rounded hover:bg-green-600">サーブを選択</button>
+                        <button data-player="A" data-choice="receive" class="pre-match-btn btn w-full bg-blue-500 text-white p-3 rounded hover:bg-blue-600">レシーブを選択</button>
                         <button data-player="A" data-choice="side" class="pre-match-btn btn w-full bg-yellow-500 text-white p-3 rounded hover:bg-yellow-600">サイドを選択</button>
                     </div>
                 </div>
@@ -95,6 +94,7 @@
                     <h3 id="pre-match-player-b-display" class="font-bold text-xl mb-2 break-words">プレーヤー B</h3>
                      <div class="space-y-2">
                         <button data-player="B" data-choice="serve" class="pre-match-btn btn w-full bg-green-500 text-white p-3 rounded hover:bg-green-600">サーブを選択</button>
+                        <button data-player="B" data-choice="receive" class="pre-match-btn btn w-full bg-blue-500 text-white p-3 rounded hover:bg-blue-600">レシーブを選択</button>
                         <button data-player="B" data-choice="side" class="pre-match-btn btn w-full bg-yellow-500 text-white p-3 rounded hover:bg-yellow-600">サイドを選択</button>
                     </div>
                 </div>
@@ -232,6 +232,7 @@
             playerBName: 'プレーヤー B',
             startTime: null,
             endTime: null,
+            isDeuce: false,
         };
 
         const initialState = JSON.parse(JSON.stringify(state));
@@ -248,11 +249,27 @@
         const updateDisplay = () => {
             elements.gamesA.textContent = state.gamesA;
             elements.gamesB.textContent = state.gamesB;
-            elements.pointsA.textContent = state.pointsA;
-            elements.pointsB.textContent = state.pointsB;
             elements.startTimeDisplay.textContent = formatTime(state.startTime);
             elements.endTimeDisplay.textContent = formatTime(state.endTime);
 
+            // ポイント表示ロジック
+            if (state.isDeuce && !state.isFinalGame) {
+                if (state.pointsA > state.pointsB) {
+                    elements.pointsA.textContent = 'AD';
+                    elements.pointsB.textContent = '-';
+                } else if (state.pointsB > state.pointsA) {
+                    elements.pointsA.textContent = '-';
+                    elements.pointsB.textContent = 'AD';
+                } else {
+                    // デュースに戻った場合
+                    elements.pointsA.textContent = state.pointsA;
+                    elements.pointsB.textContent = state.pointsB;
+                }
+            } else {
+                elements.pointsA.textContent = state.pointsA;
+                elements.pointsB.textContent = state.pointsB;
+            }
+            
             elements.serverA.classList.toggle('hidden', state.server !== 'A' || state.matchOver);
             elements.serverB.classList.toggle('hidden', state.server !== 'B' || state.matchOver);
             elements.serverA.classList.remove('blinking');
@@ -274,6 +291,7 @@
             elements.logArea.scrollTop = elements.logArea.scrollHeight;
         };
         
+        // ▼▼▼ ここからが更新箇所です ▼▼▼
         const startMatch = (firstServer, choicePlayer, choice) => {
             const nameA = document.getElementById('player-a-name-setup').value || 'プレーヤー A';
             const affiliationA = document.getElementById('player-a-affiliation-setup').value;
@@ -293,7 +311,16 @@
             state.server = firstServer;
             state.startTime = new Date();
             const choicePlayerName = state[`player${choicePlayer}Name`];
-            const choiceText = choice === 'serve' ? 'サーブ' : 'サイド';
+            
+            let choiceText;
+            if(choice === 'serve') {
+                choiceText = 'サーブ';
+            } else if (choice === 'receive') {
+                choiceText = 'レシーブ';
+            } else {
+                choiceText = 'サイド';
+            }
+
             addLog(`${choicePlayerName}が${choiceText}を選択しました。`);
             addLog(`試合開始 (サーバー: ${state[`player${firstServer}Name`]})`);
 
@@ -311,6 +338,16 @@
 
             if (player === 'A') state.pointsA++;
             if (player === 'B') state.pointsB++;
+            
+            if (!state.isFinalGame && state.pointsA >= 3 && state.pointsB >= 3) {
+                if (!state.isDeuce) {
+                    state.isDeuce = true;
+                    addLog("デュースに入りました。");
+                }
+                if (state.pointsA === state.pointsB) {
+                    addLog("スコアがデュースに戻ります。");
+                }
+            }
 
             checkGameEnd();
             updateDisplay();
@@ -318,19 +355,23 @@
 
         const checkGameEnd = () => {
             const pointsToWin = state.isFinalGame ? 7 : 4;
-            const aWins = (state.pointsA >= pointsToWin && (state.isFinalGame ? (state.pointsA - state.pointsB >= 2) : true));
-            const bWins = (state.pointsB >= pointsToWin && (state.isFinalGame ? (state.pointsB - state.pointsA >= 2) : true));
+            const winMargin = 2;
+
+            const aWins = state.pointsA >= pointsToWin && (state.pointsA - state.pointsB) >= winMargin;
+            const bWins = state.pointsB >= pointsToWin && (state.pointsB - state.pointsA) >= winMargin;
 
             if (aWins || bWins) {
                 const winner = aWins ? 'A' : 'B';
                 const winnerName = state[`player${winner}Name`];
-                addLog(`ゲーム ${state.gamesA + state.gamesB + 1}: ${winnerName}が取得 (${state.pointsA}-${state.pointsB})`);
+                const scoreLog = `${state.pointsA}-${state.pointsB}`;
+                addLog(`ゲーム ${state.gamesA + state.gamesB + 1}: ${winnerName}が取得 (${scoreLog})`);
 
                 if (winner === 'A') state.gamesA++;
                 else state.gamesB++;
                 
                 state.pointsA = 0;
                 state.pointsB = 0;
+                state.isDeuce = false; 
                 
                 state.server = state.server === 'A' ? 'B' : 'A';
 
@@ -388,7 +429,6 @@
             elements.playerBAffiliationSetup.value = '';
             updatePreMatchDisplay();
 
-            // 警告ボタンの状態をリセット
             elements.warningBtns.forEach(btn => {
                 btn.classList.remove('opacity-50', 'cursor-not-allowed');
                 btn.disabled = false;
@@ -398,7 +438,6 @@
             addLog("試合がリセットされました。");
         };
 
-        // イベントリスナーの設定
         elements.scoreABtn.addEventListener('click', () => addPoint('A'));
         elements.scoreBBtn.addEventListener('click', () => addPoint('B'));
         elements.undoBtn.addEventListener('click', undo);
@@ -419,12 +458,13 @@
                 let firstServer;
                 if (choice === 'serve') {
                     firstServer = player;
-                } else {
+                } else { // 'side' or 'receive'
                     firstServer = player === 'A' ? 'B' : 'A';
                 }
                 startMatch(firstServer, player, choice);
             });
         });
+        // ▲▲▲ ここまでが更新箇所です ▲▲▲
         
         const updatePreMatchDisplay = () => {
             const nameA = elements.playerANameSetup.value || 'プレーヤー A';
@@ -455,3 +495,5 @@
     </script>
 </body>
 </html>
+```eof
+
