@@ -166,6 +166,18 @@
                 <p>試合を開始してください。</p>
             </div>
         </section>
+        
+        <!-- ▼▼▼ ここからが更新箇所です ▼▼▼ -->
+        <!-- 試合結果保存セクション -->
+        <section id="result-save" class="bg-white p-4 rounded-lg shadow-md mt-4 hidden">
+            <h2 class="text-lg font-bold mb-2 border-b pb-2">試合結果の保存</h2>
+            <p class="text-sm text-gray-600 mb-4">試合結果をファイルとして保存、または印刷できます。</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button id="save-txt-btn" class="btn bg-green-500 text-white p-3 rounded hover:bg-green-600">テキスト形式で保存 (.txt)</button>
+                <button id="save-pdf-btn" class="btn bg-indigo-500 text-white p-3 rounded hover:bg-indigo-600">印刷 / PDF形式で表示</button>
+            </div>
+        </section>
+        <!-- ▲▲▲ ここまでが更新箇所です ▲▲▲ -->
 
         <!-- 試合結果表示 -->
         <div id="winner-display" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
@@ -195,7 +207,7 @@
             timeoutBBtn: document.getElementById('timeout-b-btn'),
             logArea: document.getElementById('log-area'),
             winnerDisplay: document.getElementById('winner-display'),
-            winnerText: document.getElementById('winner-text'),
+            winnerText: document.getElementById('winnerText'),
             closeWinnerBtn: document.getElementById('close-winner-btn'),
             matchType: document.getElementById('match-type'),
             preMatchSetup: document.getElementById('pre-match-setup'),
@@ -216,6 +228,11 @@
             warningBtns: document.querySelectorAll('.warning-btn'),
             warningPlayerAName: document.getElementById('warning-player-a-name'),
             warningPlayerBName: document.getElementById('warning-player-b-name'),
+            // ▼▼▼ ここからが更新箇所です ▼▼▼
+            resultSave: document.getElementById('result-save'),
+            saveTxtBtn: document.getElementById('save-txt-btn'),
+            savePdfBtn: document.getElementById('save-pdf-btn'),
+            // ▲▲▲ ここまでが更新箇所です ▲▲▲
         };
 
         // 試合状態の管理
@@ -230,6 +247,13 @@
             history: [],
             playerAName: 'プレーヤー A',
             playerBName: 'プレーヤー B',
+            playerAEntryNo: '',
+            playerBEntryNo: '',
+            playerAAffiliation: '',
+            playerBAffiliation: '',
+            warnings: { A: [], B: [] },
+            tossWinner: null,
+            tossChoice: null,
             startTime: null,
             endTime: null,
             isDeuce: false,
@@ -261,7 +285,6 @@
                     elements.pointsA.textContent = '-';
                     elements.pointsB.textContent = 'AD';
                 } else {
-                    // デュースに戻った場合
                     elements.pointsA.textContent = state.pointsA;
                     elements.pointsB.textContent = state.pointsB;
                 }
@@ -291,44 +314,42 @@
             elements.logArea.scrollTop = elements.logArea.scrollHeight;
         };
         
-        // ▼▼▼ ここからが更新箇所です ▼▼▼
         const startMatch = (firstServer, choicePlayer, choice) => {
-            const nameA = document.getElementById('player-a-name-setup').value || 'プレーヤー A';
-            const affiliationA = document.getElementById('player-a-affiliation-setup').value;
-            const entryNoA = document.getElementById('player-a-entry-no').value;
-            state.playerAName = `${entryNoA ? 'No.' + entryNoA + ' ' : ''}${nameA}${affiliationA ? ' (' + affiliationA + ')' : ''}`;
+            state.playerAName = document.getElementById('player-a-name-setup').value || 'プレーヤー A';
+            state.playerAAffiliation = document.getElementById('player-a-affiliation-setup').value;
+            state.playerAEntryNo = document.getElementById('player-a-entry-no').value;
+            const playerADisplayName = `${state.playerAEntryNo ? 'No.' + state.playerAEntryNo + ' ' : ''}${state.playerAName}${state.playerAAffiliation ? ' (' + state.playerAAffiliation + ')' : ''}`;
 
-            const nameB = document.getElementById('player-b-name-setup').value || 'プレーヤー B';
-            const affiliationB = document.getElementById('player-b-affiliation-setup').value;
-            const entryNoB = document.getElementById('player-b-entry-no').value;
-            state.playerBName = `${entryNoB ? 'No.' + entryNoB + ' ' : ''}${nameB}${affiliationB ? ' (' + affiliationB + ')' : ''}`;
+            state.playerBName = document.getElementById('player-b-name-setup').value || 'プレーヤー B';
+            state.playerBAffiliation = document.getElementById('player-b-affiliation-setup').value;
+            state.playerBEntryNo = document.getElementById('player-b-entry-no').value;
+            const playerBDisplayName = `${state.playerBEntryNo ? 'No.' + state.playerBEntryNo + ' ' : ''}${state.playerBName}${state.playerBAffiliation ? ' (' + state.playerBAffiliation + ')' : ''}`;
             
-            elements.scoreboardNameA.textContent = state.playerAName;
-            elements.scoreboardNameB.textContent = state.playerBName;
-            elements.warningPlayerAName.textContent = nameA;
-            elements.warningPlayerBName.textContent = nameB;
+            elements.scoreboardNameA.textContent = playerADisplayName;
+            elements.scoreboardNameB.textContent = playerBDisplayName;
+            elements.warningPlayerAName.textContent = state.playerAName;
+            elements.warningPlayerBName.textContent = state.playerBName;
 
             state.server = firstServer;
             state.startTime = new Date();
-            const choicePlayerName = state[`player${choicePlayer}Name`];
-            
+            state.tossWinner = choicePlayer;
+            state.tossChoice = choice;
+
+            const choicePlayerName = choicePlayer === 'A' ? playerADisplayName : playerBDisplayName;
             let choiceText;
-            if(choice === 'serve') {
-                choiceText = 'サーブ';
-            } else if (choice === 'receive') {
-                choiceText = 'レシーブ';
-            } else {
-                choiceText = 'サイド';
-            }
+            if(choice === 'serve') choiceText = 'サーブ';
+            else if (choice === 'receive') choiceText = 'レシーブ';
+            else choiceText = 'サイド';
 
             addLog(`${choicePlayerName}が${choiceText}を選択しました。`);
-            addLog(`試合開始 (サーバー: ${state[`player${firstServer}Name`]})`);
+            addLog(`試合開始 (サーバー: ${firstServer === 'A' ? playerADisplayName : playerBDisplayName})`);
 
             elements.preMatchSetup.classList.add('hidden');
             elements.scoreboard.classList.remove('hidden');
             elements.controls.classList.remove('hidden');
             elements.matchLog.classList.remove('hidden');
 
+            saveState(); // 初期状態を保存
             updateDisplay();
         };
 
@@ -362,7 +383,7 @@
 
             if (aWins || bWins) {
                 const winner = aWins ? 'A' : 'B';
-                const winnerName = state[`player${winner}Name`];
+                const winnerName = winner === 'A' ? state.playerAName : state.playerBName;
                 const scoreLog = `${state.pointsA}-${state.pointsB}`;
                 addLog(`ゲーム ${state.gamesA + state.gamesB + 1}: ${winnerName}が取得 (${scoreLog})`);
 
@@ -387,11 +408,14 @@
                 state.matchOver = true;
                 state.endTime = new Date();
                 const winner = state.gamesA === gamesToWin ? 'A' : 'B';
-                const winnerName = state[`player${winner}Name`];
+                const winnerName = winner === 'A' ? state.playerAName : state.playerBName;
                 const result = `${winnerName}の勝利！ (${state.gamesA}-${state.gamesB})`;
                 addLog(`試合終了: ${result}`);
                 elements.winnerText.textContent = result;
                 elements.winnerDisplay.classList.remove('hidden');
+                // ▼▼▼ ここからが更新箇所です ▼▼▼
+                elements.resultSave.classList.remove('hidden');
+                // ▲▲▲ ここまでが更新箇所です ▲▲▲
                 updateDisplay();
             } else if (state.gamesA === finalGameTrigger && state.gamesB === finalGameTrigger) {
                 state.isFinalGame = true;
@@ -400,9 +424,10 @@
         };
 
         const undo = () => {
-            if (state.history.length > 0) {
-                const prevState = state.history.pop();
-                state = prevState;
+            if (state.history.length > 1) { // 初期状態は残す
+                state.history.pop();
+                const prevState = state.history[state.history.length - 1];
+                state = JSON.parse(JSON.stringify(prevState));
                 addLog("操作を1つ戻しました。");
                 updateDisplay();
             } else {
@@ -420,6 +445,9 @@
             elements.controls.classList.add('hidden');
             elements.matchLog.classList.add('hidden');
             elements.winnerDisplay.classList.add('hidden');
+            // ▼▼▼ ここからが更新箇所です ▼▼▼
+            elements.resultSave.classList.add('hidden');
+            // ▲▲▲ ここまでが更新箇所です ▲▲▲
 
             document.getElementById('player-a-entry-no').value = '';
             document.getElementById('player-b-entry-no').value = '';
@@ -435,7 +463,6 @@
             });
 
             updateDisplay();
-            addLog("試合がリセットされました。");
         };
 
         elements.scoreABtn.addEventListener('click', () => addPoint('A'));
@@ -464,7 +491,6 @@
                 startMatch(firstServer, player, choice);
             });
         });
-        // ▲▲▲ ここまでが更新箇所です ▲▲▲
         
         const updatePreMatchDisplay = () => {
             const nameA = elements.playerANameSetup.value || 'プレーヤー A';
@@ -485,13 +511,240 @@
             button.addEventListener('click', (e) => {
                 const player = e.target.dataset.player;
                 const type = e.target.dataset.type;
-                const playerName = state[`player${player}Name`];
+                state.warnings[player].push(type);
+                const playerName = player === 'A' ? state.playerAName : state.playerBName;
                 addLog(`警告: ${playerName}に${type}が与えられました。`);
                 e.target.classList.add('opacity-50', 'cursor-not-allowed');
                 e.target.disabled = true;
             });
         });
 
+        // ▼▼▼ ここからが更新箇所です ▼▼▼
+        // 記録処理のためのヘルパー関数
+        const getMatchData = () => {
+            const games = [];
+            let currentGamePoints = [];
+            let lastGamesA = 0;
+            let lastGamesB = 0;
+
+            state.history.forEach((hist, index) => {
+                if (index === 0) return; // 初期状態はスキップ
+
+                const gameChanged = hist.gamesA !== lastGamesA || hist.gamesB !== lastGamesB;
+                
+                if (!gameChanged) {
+                     currentGamePoints.push({ a: hist.pointsA, b: hist.pointsB });
+                }
+                
+                if (gameChanged || index === state.history.length - 1) {
+                    const prevHist = state.history[index - 1];
+                    games.push({
+                        gameNumber: lastGamesA + lastGamesB + 1,
+                        points: currentGamePoints,
+                        winner: hist.gamesA > lastGamesA ? 'A' : 'B',
+                        finalPoints: { a: prevHist.pointsA, b: prevHist.pointsB }
+                    });
+                    currentGamePoints = [{ a: hist.pointsA, b: hist.pointsB }]; // 新しいゲームの最初のポイント
+                    lastGamesA = hist.gamesA;
+                    lastGamesB = hist.gamesB;
+                }
+            });
+             // 最後のゲームのポイントが抜ける場合があるので追加
+            if (state.matchOver && currentGamePoints.length > 0) {
+                 const finalState = state.history[state.history.length-1];
+                 const winner = finalState.gamesA > lastGamesA ? 'A' : 'B';
+                 if(games[games.length-1].gameNumber <= finalState.gamesA + finalState.gamesB){
+                    games[games.length-1].points = currentGamePoints;
+                    games[games.length-1].winner = winner;
+                    games[games.length-1].finalPoints = { a: finalState.pointsA, b: finalState.pointsB };
+                 } else {
+                    games.push({
+                        gameNumber: finalState.gamesA + finalState.gamesB,
+                        points: currentGamePoints,
+                        winner: winner,
+                        finalPoints: { a: finalState.pointsA, b: finalState.pointsB }
+                    });
+                 }
+            }
+
+
+            return {
+                tournamentName: document.getElementById('tournament-name').value,
+                entryCategory: document.getElementById('entry-category').value,
+                roundName: document.getElementById('round-name').value,
+                courtNumber: document.getElementById('court-number').value,
+                mainReferee: document.getElementById('main-referee').value,
+                subReferee: document.getElementById('sub-referee').value,
+                lineReferee1: document.getElementById('line-referee1').value,
+                lineReferee2: document.getElementById('line-referee2').value,
+                startTime: formatTime(state.startTime),
+                endTime: formatTime(state.endTime),
+                playerA: { name: state.playerAName, no: state.playerAEntryNo, affiliation: state.playerAAffiliation },
+                playerB: { name: state.playerBName, no: state.playerBEntryNo, affiliation: state.playerBAffiliation },
+                finalGameScore: { a: state.gamesA, b: state.gamesB },
+                winner: state.gamesA > state.gamesB ? 'A' : 'B',
+                games: games,
+                warnings: state.warnings,
+            };
+        };
+
+        // テキスト形式で保存
+        const generateTextRecord = () => {
+            const data = getMatchData();
+            let text = 'ソフトテニス試合結果\n';
+            text += '====================================\n';
+            text += `大会名: ${data.tournamentName}\n`;
+            text += `区分: ${data.entryCategory} | ${data.roundName} | コート: ${data.courtNumber}\n`;
+            text += `時間: ${data.startTime} - ${data.endTime}\n`;
+            text += `審判: (正) ${data.mainReferee} (副) ${data.subReferee} (線) ${data.lineReferee1}, ${data.lineReferee2}\n`;
+            text += '------------------------------------\n';
+            text += `(A) ${data.playerA.name}\n`;
+            text += `(B) ${data.playerB.name}\n`;
+            text += `最終スコア: ${data.finalGameScore.a} - ${data.finalGameScore.b}\n`;
+            text += `勝者: ${data.winner === 'A' ? data.playerA.name : data.playerB.name}\n`;
+            text += '====================================\n\n';
+            text += 'ポイント履歴:\n';
+
+            data.games.forEach(game => {
+                text += `\n--- 第${game.gameNumber}ゲーム (取得: ${game.winner === 'A' ? data.playerA.name : data.playerB.name}) ---\n`;
+                let pointLog = '';
+                game.points.forEach(p => {
+                    pointLog += `${p.a}-${p.b}, `;
+                });
+                text += pointLog.slice(0, -2) + '\n';
+            });
+
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `試合結果_${data.playerA.name}_vs_${data.playerB.name}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
+        // 印刷/PDF形式で表示
+        const generatePrintableRecord = () => {
+            const data = getMatchData();
+            const maxGames = parseInt(elements.matchType.value);
+            
+            let gameHeaders = '';
+            for (let i = 1; i <= maxGames; i++) {
+                gameHeaders += `<th class="border p-1 text-center">${i}</th>`;
+            }
+
+            let srRowA = '';
+            let srRowB = '';
+            let pointRowsA = '';
+            let pointRowsB = '';
+
+            for (let i = 0; i < maxGames; i++) {
+                const game = data.games[i];
+                let server = '';
+                if(game){
+                    const initialServer = state.history[0].server;
+                    // ゲーム数(i)が偶数なら初期サーバー、奇数なら相手
+                    server = (i % 2 === 0) ? initialServer : (initialServer === 'A' ? 'B' : 'A');
+                }
+
+                srRowA += `<td class="border p-1 text-center h-8">${server === 'A' ? '●' : ''}</td>`;
+                srRowB += `<td class="border p-1 text-center h-8">${server === 'B' ? '●' : ''}</td>`;
+                
+                let pointsA = '';
+                let pointsB = '';
+                if(game) {
+                    game.points.forEach(p => {
+                        pointsA += `<div class="border-b h-6 flex items-center justify-center">${p.a}</div>`;
+                        pointsB += `<div class="border-b h-6 flex items-center justify-center">${p.b}</div>`;
+                    });
+                }
+                pointRowsA += `<td class="border p-0 align-top">${pointsA}</td>`;
+                pointRowsB += `<td class="border p-0 align-top">${pointsB}</td>`;
+            }
+
+            const html = `
+                <html>
+                <head>
+                    <title>試合結果: ${data.playerA.name} vs ${data.playerB.name}</title>
+                    <script src="https://cdn.tailwindcss.com"><\/script>
+                    <style> @media print { @page { size: A4 landscape; } } </style>
+                </head>
+                <body class="p-4">
+                    <h1 class="text-2xl font-bold text-center mb-4">ダブルス・シングルス採点票</h1>
+                    <div class="grid grid-cols-3 gap-4 mb-4 text-sm">
+                        <div>
+                            <p><strong>大会名:</strong> ${data.tournamentName}</p>
+                            <p><strong>区分:</strong> ${data.entryCategory}</p>
+                            <p><strong>回戦:</strong> ${data.roundName}</p>
+                            <p><strong>コート:</strong> ${data.courtNumber}</p>
+                        </div>
+                        <div class="text-center">
+                            <p><strong>正審:</strong> ${data.mainReferee}</p>
+                            <p><strong>副審:</strong> ${data.subReferee}</p>
+                            <p><strong>線審:</strong> ${data.lineReferee1}, ${data.lineReferee2}</p>
+                        </div>
+                        <div class="text-right">
+                            <p><strong>開始:</strong> ${data.startTime}</p>
+                            <p><strong>終了:</strong> ${data.endTime}</p>
+                            <p><strong>試合時間:</strong> ${state.startTime && state.endTime ? Math.round((state.endTime - state.startTime) / 60000) + '分' : '-'}</p>
+                        </div>
+                    </div>
+
+                    <table class="w-full border-collapse text-sm">
+                        <thead>
+                            <tr>
+                                <th class="border p-1">No.</th>
+                                <th class="border p-1">プレーヤー</th>
+                                <th class="border p-1">所属</th>
+                                <th class="border p-1">SR</th>
+                                ${gameHeaders}
+                                <th class="border p-1 text-center">計</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="border p-1 text-center">${data.playerA.no}</td>
+                                <td class="border p-1">${data.playerA.name.replace(`No.${data.playerA.no} `, '')}</td>
+                                <td class="border p-1">${data.playerA.affiliation}</td>
+                                <td class="border p-0">
+                                    <table><tbody><tr>${srRowA}</tr></tbody></table>
+                                </td>
+                                ${pointRowsA}
+                                <td class="border p-1 text-center text-2xl font-bold">${data.finalGameScore.a}</td>
+                            </tr>
+                            <tr>
+                                <td class="border p-1 text-center">${data.playerB.no}</td>
+                                <td class="border p-1">${data.playerB.name.replace(`No.${data.playerB.no} `, '')}</td>
+                                <td class="border p-1">${data.playerB.affiliation}</td>
+                                <td class="border p-0">
+                                    <table><tbody><tr>${srRowB}</tr></tbody></table>
+                                </td>
+                                ${pointRowsB}
+                                <td class="border p-1 text-center text-2xl font-bold">${data.finalGameScore.b}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="mt-4 text-center">
+                      <p>勝者: <strong>${data.winner === 'A' ? data.playerA.name : data.playerB.name}</strong></p>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => { printWindow.print(); }, 500);
+        };
+        
+        elements.saveTxtBtn.addEventListener('click', generateTextRecord);
+        elements.savePdfBtn.addEventListener('click', generatePrintableRecord);
+        // ▲▲▲ ここまでが更新箇所です ▲▲▲
+
     </script>
 </body>
 </html>
+
