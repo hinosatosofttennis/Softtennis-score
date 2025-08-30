@@ -231,7 +231,6 @@
             savePdfBtn: document.getElementById('save-pdf-btn'),
         };
 
-        // ▼▼▼ ここからが修正箇所です ▼▼▼
         // 試合状態の管理
         let state = {}; // 初期化はresetMatchで行う
 
@@ -275,7 +274,6 @@
                 isDeuce: state.isDeuce
             });
         };
-        // ▲▲▲ ここまでが修正箇所です ▲▲▲
 
         const formatTime = (date) => {
             if (!date) return '- - : - -';
@@ -434,7 +432,6 @@
             }
         };
 
-        // ▼▼▼ ここからが修正箇所です ▼▼▼
         const undo = () => {
             if (pointHistory.length > 0) {
                 const prevState = pointHistory.pop(); // 最後の履歴を取り出す
@@ -458,7 +455,6 @@
                 addLog("これ以上戻せません。");
             }
         };
-        // ▲▲▲ ここまでが修正箇所です ▲▲▲
 
         const resetMatch = () => {
             resetState();
@@ -544,7 +540,6 @@
             });
         });
 
-        // ▼▼▼ ここからが修正箇所です ▼▼▼
         // 記録処理のためのヘルパー関数
         const getMatchData = () => {
             const games = [];
@@ -558,23 +553,23 @@
                  const gameChanged = hist.gamesA !== lastGamesA || hist.gamesB !== lastGamesB;
 
                  if (!gameChanged) {
-                    currentGamePoints.push({ a: hist.pointsA, b: hist.pointsB });
+                    currentGamePoints.push({ a: hist.pointsA, b: hist.pointsB, isFinal: hist.isFinalGame });
                  } else {
-                    if (index > 0) { // 最初のポイントではない場合
+                    if (index > 0) {
                         games.push({
                             gameNumber: lastGamesA + lastGamesB + 1,
                             points: currentGamePoints,
                             winner: hist.gamesA > lastGamesA ? 'A' : 'B',
                         });
                     }
-                    currentGamePoints = [{ a: hist.pointsA, b: hist.pointsB }];
+                    currentGamePoints = [{ a: hist.pointsA, b: hist.pointsB, isFinal: hist.isFinalGame }];
                     lastGamesA = hist.gamesA;
                     lastGamesB = hist.gamesB;
                  }
             });
 
             // 最後のゲームを追加
-            if (currentGamePoints.length > 0) {
+            if (currentGamePoints.length > 1) { // 1つ以上のポイントがあるゲームのみ追加
                  games.push({
                     gameNumber: lastGamesA + lastGamesB + 1,
                     points: currentGamePoints,
@@ -601,7 +596,6 @@
                 warnings: state.warnings,
             };
         };
-        // ▲▲▲ ここまでが修正箇所です ▲▲▲
 
         // テキスト形式で保存
         const generateTextRecord = () => {
@@ -640,6 +634,7 @@
             URL.revokeObjectURL(url);
         };
 
+        // ▼▼▼ ここからが修正箇所です ▼▼▼
         // 印刷/PDF形式で表示
         const generatePrintableRecord = () => {
             const data = getMatchData();
@@ -655,7 +650,7 @@
             let pointRowsA = '';
             let pointRowsB = '';
             
-            const initialServer = pointHistory.length > 0 ? pointHistory[0].server : state.server;
+            const initialServer = state.tossChoice === 'serve' ? state.tossWinner : (state.tossWinner === 'A' ? 'B' : 'A');
 
             for (let i = 0; i < maxGames; i++) {
                 const game = data.games.find(g => g.gameNumber === i + 1);
@@ -671,17 +666,15 @@
                 let pointsA = '';
                 let pointsB = '';
                 if(game) {
-                    let isFinalGameInHist = (i + 1) === (gamesToWin - 1) * 2 + 1;
-
                     game.points.forEach(p => {
                         let pa = p.a;
                         let pb = p.b;
-                         if ( p.a >= 3 && p.b >= 3 && !isFinalGameInHist) {
+                         if ( p.a >= 3 && p.b >= 3 && !p.isFinal) {
                             if (p.a > p.b) { pa = 'AD'; pb = '-'; }
                             else if (p.b > p.a) { pa = '-'; pb = 'AD'; }
                         }
-                        pointsA += `<div class="border-b h-6 flex items-center justify-center">${pa}</div>`;
-                        pointsB += `<div class="border-b h-6 flex items-center justify-center">${pb}</div>`;
+                        pointsA += `<div class="border-b last:border-b-0 h-6 flex items-center justify-center">${pa}</div>`;
+                        pointsB += `<div class="border-b last:border-b-0 h-6 flex items-center justify-center">${pb}</div>`;
                     });
                 }
                 pointRowsA += `<td class="border p-0 align-top">${pointsA}</td>`;
@@ -732,7 +725,7 @@
                                 <td class="border p-1" rowspan="2">${data.playerA.name}</td>
                                 <td class="border p-1" rowspan="2">${data.playerA.affiliation}</td>
                                 ${pointRowsA}
-                                <td class="border p-1 text-center text-2xl font-bold" rowspan="4">${data.finalGameScore.a}</td>
+                                <td class="border p-1 text-center text-2xl font-bold" rowspan="2">${data.finalGameScore.a}</td>
                             </tr>
                              <tr>
                                 ${srRowA}
@@ -742,7 +735,7 @@
                                 <td class="border p-1" rowspan="2">${data.playerB.name}</td>
                                 <td class="border p-1" rowspan="2">${data.playerB.affiliation}</td>
                                 ${pointRowsB}
-                                <td class="border p-1 text-center text-2xl font-bold" rowspan="4">${data.finalGameScore.b}</td>
+                                <td class="border p-1 text-center text-2xl font-bold" rowspan="2">${data.finalGameScore.b}</td>
                             </tr>
                              <tr>
                                 ${srRowB}
@@ -762,6 +755,7 @@
             printWindow.focus();
             setTimeout(() => { printWindow.print(); }, 500);
         };
+        // ▲▲▲ ここまでが修正箇所です ▲▲▲
         
         elements.saveTxtBtn.addEventListener('click', generateTextRecord);
         elements.savePdfBtn.addEventListener('click', generatePrintableRecord);
