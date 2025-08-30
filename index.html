@@ -205,9 +205,7 @@
             timeoutBBtn: document.getElementById('timeout-b-btn'),
             logArea: document.getElementById('log-area'),
             winnerDisplay: document.getElementById('winner-display'),
-            // ▼▼▼ ここからが修正箇所です ▼▼▼
-            winnerText: document.getElementById('winner-text'), // IDを'winnerText'から'winner-text'に修正
-            // ▲▲▲ ここまでが修正箇所です ▲▲▲
+            winnerText: document.getElementById('winner-text'),
             closeWinnerBtn: document.getElementById('close-winner-btn'),
             matchType: document.getElementById('match-type'),
             preMatchSetup: document.getElementById('pre-match-setup'),
@@ -233,35 +231,51 @@
             savePdfBtn: document.getElementById('save-pdf-btn'),
         };
 
+        // ▼▼▼ ここからが修正箇所です ▼▼▼
         // 試合状態の管理
-        let state = {
-            pointsA: 0,
-            pointsB: 0,
-            gamesA: 0,
-            gamesB: 0,
-            server: null,
-            isFinalGame: false,
-            matchOver: false,
-            history: [],
-            playerAName: 'プレーヤー A',
-            playerBName: 'プレーヤー B',
-            playerAEntryNo: '',
-            playerBEntryNo: '',
-            playerAAffiliation: '',
-            playerBAffiliation: '',
-            warnings: { A: [], B: [] },
-            tossWinner: null,
-            tossChoice: null,
-            startTime: null,
-            endTime: null,
-            isDeuce: false,
-        };
+        let state = {}; // 初期化はresetMatchで行う
 
-        const initialState = JSON.parse(JSON.stringify(state));
+        // パフォーマンス改善のため、履歴はポイントの変動のみを記録する軽量なものに変更
+        let pointHistory = [];
 
+        const resetState = () => {
+             state = {
+                pointsA: 0,
+                pointsB: 0,
+                gamesA: 0,
+                gamesB: 0,
+                server: null,
+                isFinalGame: false,
+                matchOver: false,
+                playerAName: 'プレーヤー A',
+                playerBName: 'プレーヤー B',
+                playerAEntryNo: '',
+                playerBEntryNo: '',
+                playerAAffiliation: '',
+                playerBAffiliation: '',
+                warnings: { A: [], B: [] },
+                tossWinner: null,
+                tossChoice: null,
+                startTime: null,
+                endTime: null,
+                isDeuce: false,
+            };
+            pointHistory = [];
+        }
+        
+        // 操作前の状態を記録
         const saveState = () => {
-            state.history.push(JSON.parse(JSON.stringify(state)));
+            pointHistory.push({
+                pointsA: state.pointsA,
+                pointsB: state.pointsB,
+                gamesA: state.gamesA,
+                gamesB: state.gamesB,
+                server: state.server,
+                isFinalGame: state.isFinalGame,
+                isDeuce: state.isDeuce
+            });
         };
+        // ▲▲▲ ここまでが修正箇所です ▲▲▲
 
         const formatTime = (date) => {
             if (!date) return '- - : - -';
@@ -313,6 +327,8 @@
         };
         
         const startMatch = (firstServer, choicePlayer, choice) => {
+            resetState(); // 試合開始時に状態をリセット
+
             state.playerAName = document.getElementById('player-a-name-setup').value || 'プレーヤー A';
             state.playerAAffiliation = document.getElementById('player-a-affiliation-setup').value;
             state.playerAEntryNo = document.getElementById('player-a-entry-no').value;
@@ -347,13 +363,12 @@
             elements.controls.classList.remove('hidden');
             elements.matchLog.classList.remove('hidden');
 
-            saveState(); // 初期状態を保存
             updateDisplay();
         };
 
         const addPoint = (player) => {
             if (state.matchOver) return;
-            saveState();
+            saveState(); // ポイントが入る直前の状態を保存
 
             if (player === 'A') state.pointsA++;
             if (player === 'B') state.pointsB++;
@@ -419,20 +434,34 @@
             }
         };
 
+        // ▼▼▼ ここからが修正箇所です ▼▼▼
         const undo = () => {
-            if (state.history.length > 1) { // 初期状態は残す
-                state.history.pop();
-                const prevState = state.history[state.history.length - 1];
-                state = JSON.parse(JSON.stringify(prevState));
+            if (pointHistory.length > 0) {
+                const prevState = pointHistory.pop(); // 最後の履歴を取り出す
+                // stateの各プロパティを履歴の状態に戻す
+                state.pointsA = prevState.pointsA;
+                state.pointsB = prevState.pointsB;
+                state.gamesA = prevState.gamesA;
+                state.gamesB = prevState.gamesB;
+                state.server = prevState.server;
+                state.isFinalGame = prevState.isFinalGame;
+                state.isDeuce = prevState.isDeuce;
+                state.matchOver = false; // 試合が終わっていても戻せるように
+                
                 addLog("操作を1つ戻しました。");
                 updateDisplay();
+                 // undo後に試合結果表示などを非表示にする
+                elements.winnerDisplay.classList.add('hidden');
+                elements.resultSave.classList.add('hidden');
+
             } else {
                 addLog("これ以上戻せません。");
             }
         };
+        // ▲▲▲ ここまでが修正箇所です ▲▲▲
 
         const resetMatch = () => {
-            state = JSON.parse(JSON.stringify(initialState));
+            resetState();
             
             elements.logArea.innerHTML = '<p>試合を開始してください。</p>';
             
@@ -458,6 +487,8 @@
 
             updateDisplay();
         };
+        
+        document.addEventListener('DOMContentLoaded', resetMatch);
 
         elements.scoreABtn.addEventListener('click', () => addPoint('A'));
         elements.scoreBBtn.addEventListener('click', () => addPoint('B'));
@@ -513,53 +544,43 @@
             });
         });
 
+        // ▼▼▼ ここからが修正箇所です ▼▼▼
         // 記録処理のためのヘルパー関数
         const getMatchData = () => {
             const games = [];
             let currentGamePoints = [];
             let lastGamesA = 0;
             let lastGamesB = 0;
+            
+            const fullHistory = [...pointHistory, state]; // 現在の最終スコアも履歴に加える
 
-            state.history.forEach((hist, index) => {
-                if (index === 0) return; // 初期状態はスキップ
+            fullHistory.forEach((hist, index) => {
+                 const gameChanged = hist.gamesA !== lastGamesA || hist.gamesB !== lastGamesB;
 
-                const gameChanged = hist.gamesA !== lastGamesA || hist.gamesB !== lastGamesB;
-                
-                if (!gameChanged) {
-                     currentGamePoints.push({ a: hist.pointsA, b: hist.pointsB });
-                }
-                
-                if (gameChanged || index === state.history.length - 1) {
-                    const prevHist = state.history[index - 1];
-                    games.push({
-                        gameNumber: lastGamesA + lastGamesB + 1,
-                        points: currentGamePoints,
-                        winner: hist.gamesA > lastGamesA ? 'A' : 'B',
-                        finalPoints: { a: prevHist.pointsA, b: prevHist.pointsB }
-                    });
-                    currentGamePoints = [{ a: hist.pointsA, b: hist.pointsB }]; // 新しいゲームの最初のポイント
+                 if (!gameChanged) {
+                    currentGamePoints.push({ a: hist.pointsA, b: hist.pointsB });
+                 } else {
+                    if (index > 0) { // 最初のポイントではない場合
+                        games.push({
+                            gameNumber: lastGamesA + lastGamesB + 1,
+                            points: currentGamePoints,
+                            winner: hist.gamesA > lastGamesA ? 'A' : 'B',
+                        });
+                    }
+                    currentGamePoints = [{ a: hist.pointsA, b: hist.pointsB }];
                     lastGamesA = hist.gamesA;
                     lastGamesB = hist.gamesB;
-                }
-            });
-             // 最後のゲームのポイントが抜ける場合があるので追加
-            if (state.matchOver && currentGamePoints.length > 0) {
-                 const finalState = state.history[state.history.length-1];
-                 const winner = finalState.gamesA > lastGamesA ? 'A' : 'B';
-                 if(games.length > 0 && games[games.length-1].gameNumber <= finalState.gamesA + finalState.gamesB){
-                    games[games.length-1].points = currentGamePoints;
-                    games[games.length-1].winner = winner;
-                    games[games.length-1].finalPoints = { a: finalState.pointsA, b: finalState.pointsB };
-                 } else {
-                    games.push({
-                        gameNumber: finalState.gamesA + finalState.gamesB,
-                        points: currentGamePoints,
-                        winner: winner,
-                        finalPoints: { a: finalState.pointsA, b: finalState.pointsB }
-                    });
                  }
-            }
+            });
 
+            // 最後のゲームを追加
+            if (currentGamePoints.length > 0) {
+                 games.push({
+                    gameNumber: lastGamesA + lastGamesB + 1,
+                    points: currentGamePoints,
+                    winner: state.gamesA > lastGamesA ? 'A' : 'B'
+                });
+            }
 
             return {
                 tournamentName: document.getElementById('tournament-name').value,
@@ -580,6 +601,7 @@
                 warnings: state.warnings,
             };
         };
+        // ▲▲▲ ここまでが修正箇所です ▲▲▲
 
         // テキスト形式で保存
         const generateTextRecord = () => {
@@ -591,8 +613,8 @@
             text += `時間: ${data.startTime} - ${data.endTime}\n`;
             text += `審判: (正) ${data.mainReferee} (副) ${data.subReferee} (線) ${data.lineReferee1}, ${data.lineReferee2}\n`;
             text += '------------------------------------\n';
-            text += `(A) ${data.playerA.name}\n`;
-            text += `(B) ${data.playerB.name}\n`;
+            text += `(A) ${data.playerA.no ? 'No.' + data.playerA.no + ' ' : ''}${data.playerA.name}${data.playerA.affiliation ? ' (' + data.playerA.affiliation + ')' : ''}\n`;
+            text += `(B) ${data.playerB.no ? 'No.' + data.playerB.no + ' ' : ''}${data.playerB.name}${data.playerB.affiliation ? ' (' + data.playerB.affiliation + ')' : ''}\n`;
             text += `最終スコア: ${data.finalGameScore.a} - ${data.finalGameScore.b}\n`;
             text += `勝者: ${data.winner === 'A' ? data.playerA.name : data.playerB.name}\n`;
             text += '====================================\n\n';
@@ -625,20 +647,23 @@
             
             let gameHeaders = '';
             for (let i = 1; i <= maxGames; i++) {
-                gameHeaders += `<th class="border p-1 text-center">${i}</th>`;
+                gameHeaders += `<th class="border p-1 text-center w-12">${i}</th>`;
             }
 
             let srRowA = '';
             let srRowB = '';
             let pointRowsA = '';
             let pointRowsB = '';
+            
+            const initialServer = pointHistory.length > 0 ? pointHistory[0].server : state.server;
 
             for (let i = 0; i < maxGames; i++) {
                 const game = data.games.find(g => g.gameNumber === i + 1);
                 
                 let server = '';
-                const initialServer = state.history[0].server;
-                server = (i % 2 === 0) ? initialServer : (initialServer === 'A' ? 'B' : 'A');
+                if(initialServer){
+                    server = (i % 2 === 0) ? initialServer : (initialServer === 'A' ? 'B' : 'A');
+                }
 
                 srRowA += `<td class="border p-1 text-center h-8">${server === 'A' ? '●' : ''}</td>`;
                 srRowB += `<td class="border p-1 text-center h-8">${server === 'B' ? '●' : ''}</td>`;
@@ -646,10 +671,12 @@
                 let pointsA = '';
                 let pointsB = '';
                 if(game) {
+                    let isFinalGameInHist = (i + 1) === (gamesToWin - 1) * 2 + 1;
+
                     game.points.forEach(p => {
                         let pa = p.a;
                         let pb = p.b;
-                         if ( p.a >= 3 && p.b >= 3 && !state.isFinalGame) {
+                         if ( p.a >= 3 && p.b >= 3 && !isFinalGameInHist) {
                             if (p.a > p.b) { pa = 'AD'; pb = '-'; }
                             else if (p.b > p.a) { pa = '-'; pb = 'AD'; }
                         }
@@ -702,7 +729,7 @@
                         <tbody>
                             <tr>
                                 <td class="border p-1 text-center" rowspan="2">${data.playerA.no}</td>
-                                <td class="border p-1" rowspan="2">${data.playerA.name.replace(`No.${data.playerA.no} `, '')}</td>
+                                <td class="border p-1" rowspan="2">${data.playerA.name}</td>
                                 <td class="border p-1" rowspan="2">${data.playerA.affiliation}</td>
                                 ${pointRowsA}
                                 <td class="border p-1 text-center text-2xl font-bold" rowspan="4">${data.finalGameScore.a}</td>
@@ -712,7 +739,7 @@
                             </tr>
                             <tr>
                                 <td class="border p-1 text-center" rowspan="2">${data.playerB.no}</td>
-                                <td class="border p-1" rowspan="2">${data.playerB.name.replace(`No.${data.playerB.no} `, '')}</td>
+                                <td class="border p-1" rowspan="2">${data.playerB.name}</td>
                                 <td class="border p-1" rowspan="2">${data.playerB.affiliation}</td>
                                 ${pointRowsB}
                                 <td class="border p-1 text-center text-2xl font-bold" rowspan="4">${data.finalGameScore.b}</td>
@@ -742,3 +769,4 @@
     </script>
 </body>
 </html>
+
