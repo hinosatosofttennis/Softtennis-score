@@ -480,12 +480,13 @@
                 currentGamePoints.push({ a: hist.pointsA, b: hist.pointsB, isFinal: hist.isFinalGame });
             });
             
-            if (state.matchOver) {
-                 games.push({
+            if (state.matchOver && currentGamePoints.length > 0) {
+                const finalPoint = currentGamePoints[currentGamePoints.length - 1];
+                games.push({
                     gameNumber: lastGamesA + lastGamesB + 1,
                     points: currentGamePoints,
                     winner: state.gamesA > lastGamesA ? 'A' : 'B',
-                    finalPoint: { a: state.pointsA, b: state.pointsB }
+                    finalPoint: { a: finalPoint.a, b: finalPoint.b }
                 });
             }
 
