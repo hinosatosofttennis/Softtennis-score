@@ -543,59 +543,57 @@
         };
 
         const generatePrintableRecord = () => {
-            const data = getMatchData();
-            const maxGames = parseInt(elements.matchType.value);
-            const finalGameCount = Math.ceil(maxGames / 2) * 2 -1;
+        const generatePrintableRecord = () => {
+    const data = getMatchData();
+    const maxGames = parseInt(elements.matchType.value);
+    
+    const finalScoreA = data.winner === 'A' ? `<span class="circle">${data.finalGameScore.a}</span>` : data.finalGameScore.a;
+    const finalScoreB = data.winner === 'B' ? `<span class="circle">${data.finalGameScore.b}</span>` : data.finalGameScore.b;
+
+    let gameRows = '';
+
+    for (let i = 1; i <= maxGames; i++) {
+        const game = data.games.find(g => g.gameNumber === i);
+        let gameScoreA = '', gameScoreB = '', pointsA = '', pointsB = '';
+
+        if(game){
+            const winner = game.winner;
+            gameScoreA = winner === 'A' ? `<span class="circle">${game.finalPoint.a}</span>` : game.finalPoint.a;
+            gameScoreB = winner === 'B' ? `<span class="circle">${game.finalPoint.b}</span>` : game.finalPoint.b;
             
-            const finalScoreA = data.winner === 'A' ? `<span class="circle">${data.finalGameScore.a}</span>` : data.finalGameScore.a;
-            const finalScoreB = data.winner === 'B' ? `<span class="circle">${data.finalGameScore.b}</span>` : data.finalGameScore.b;
-
-            let gameRows = '';
-
-            for (let i = 1; i <= finalGameCount + 2; i++) {
-                const game = data.games.find(g => g.gameNumber === i);
-                let gameScoreA = '', gameScoreB = '', pointsA = '', pointsB = '';
-
-                if(game){
-                    const winner = game.winner;
-                    gameScoreA = winner === 'A' ? `<span class="circle">${game.finalPoint.a}</span>` : game.finalPoint.a;
-                    gameScoreB = winner === 'B' ? `<span class="circle">${game.finalPoint.b}</span>` : game.finalPoint.b;
-                    
-                    let lastPointA = 0, lastPointB = 0;
-                    
-                    const gamePoints = game.points.slice(1);
-                    gamePoints.forEach(p => {
-                        pointsA += (p.a > lastPointA ? '○' : '×');
-                        pointsB += (p.b > lastPointB ? '○' : '×');
-                        lastPointA = p.a; lastPointB = p.b;
-                    });
-                }
-                 
-                const initialServer = state.tossChoice === 'serve' ? state.tossWinner : (state.tossWinner === 'A' ? 'B' : 'A');
-                let server = '', receiver = '';
-                if(initialServer){
-                    server = ((i-1) % 2 === 0) ? initialServer : (initialServer === 'A' ? 'B' : 'A');
-                    receiver = server === 'A' ? 'B' : 'A';
-                }
-                const srLabelA = server === 'A' ? 'S' : (receiver === 'A' ? 'R' : '');
-                const srLabelB = server === 'B' ? 'S' : (receiver === 'B' ? 'R' : '');
-                
-                const gameLabel = i === finalGameCount ? 'F' : i;
-
-                if (i > finalGameCount + 1) continue;
+            let lastPointA = 0, lastPointB = 0;
+            
+            const gamePoints = game.points.slice(1);
+            gamePoints.forEach(p => {
+                pointsA += (p.a > lastPointA ? '○' : '×');
+                pointsB += (p.b > lastPointB ? '○' : '×');
+                lastPointA = p.a; lastPointB = p.b;
+            });
+        }
+         
+        const initialServer = state.tossChoice === 'serve' ? state.tossWinner : (state.tossWinner === 'A' ? 'B' : 'A');
+        let server = '', receiver = '';
+        if(initialServer){
+            server = ((i-1) % 2 === 0) ? initialServer : (initialServer === 'A' ? 'B' : 'A');
+            receiver = server === 'A' ? 'B' : 'A';
+        }
+        const srLabelA = server === 'A' ? 'S' : (receiver === 'A' ? 'R' : '');
+        const srLabelB = server === 'B' ? 'S' : (receiver === 'B' ? 'R' : '');
+        
+        const gameLabel = i === maxGames ? 'F' : i;
 
                 gameRows += `
-                    <tr>
-                        <td class="p-1 font-bold text-left">${srLabelA}</td>
-                        <td class="p-1 text-left tracking-widest" style="font-family: 'Courier New', monospace; font-size: 14px;">${pointsA}</td>
-                        <td class="p-1 text-center font-bold">${gameScoreA}</td>
-                        <td class="border-x p-1 text-center font-bold">${gameLabel}</td>
-                        <td class="p-1 text-center font-bold">${gameScoreB}</td>
-                        <td class="p-1 text-left tracking-widest" style="font-family: 'Courier New', monospace; font-size: 14px;">${pointsB}</td>
-                        <td class="p-1 font-bold text-right">${srLabelB}</td>
-                    </tr>
-                `;
-            }
+            <tr>
+                <td class="p-1 font-bold text-left">${srLabelA}</td>
+                <td class="p-1 text-left tracking-widest" style="font-family: 'Courier New', monospace; font-size: 14px;">${pointsA}</td>
+                <td class="p-1 text-center font-bold">${gameScoreA}</td>
+                <td class="border-x p-1 text-center font-bold">${gameLabel}</td>
+                <td class="p-1 text-center font-bold">${gameScoreB}</td>
+                <td class="p-1 text-left tracking-widest" style="font-family: 'Courier New', monospace; font-size: 14px;">${pointsB}</td>
+                <td class="p-1 font-bold text-right">${srLabelB}</td>
+            </tr>
+        `;
+    }
 
             const html = `
                 <html>
